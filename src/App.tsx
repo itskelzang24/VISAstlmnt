@@ -60,43 +60,56 @@ export default function App() {
     setIsDragging(false);
     const files = e.dataTransfer.files;
     if (files.length > 0) {
-      handleFileSelected(files[0]);
+      // If multiple files dropped, process the first batch
+      handleFilesSelected(Array.from(files));
     }
   };
 
   const handleFileInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      handleFileSelected(files[0]);
+      handleFilesSelected(Array.from(files));
     }
   };
 
-  const handleFileSelected = (file: File) => {
-    if (!file.name.toLowerCase().endsWith('.txt')) {
-      addLog(`File rejected: "${file.name}". VSS-110 parse expects standard .txt plain files.`, 'error');
+  // Handle a list of files (multiple selection or drop)
+  const handleFilesSelected = (files: File[]) => {
+    // Filter .txt files only
+    const txtFiles = files.filter(f => f.name.toLowerCase().endsWith('.txt'));
+    if (txtFiles.length === 0) {
+      addLog(`No valid .txt files found in selection.`, 'error');
       setErrorMsg("Invalid file format. Only plain text (.txt) Visa Report files are supported.");
       return;
     }
 
-    const sizeKB = (file.size / 1024).toFixed(1);
-    setFileName(file.name);
-    setFileSize(`${sizeKB} KB`);
+    // Show combined identity
+    const combinedNames = txtFiles.map(f => f.name).join(', ');
+    const totalBytes = txtFiles.reduce((acc, f) => acc + f.size, 0);
+    setFileName(`Multiple files: ${combinedNames}`);
+    setFileSize(`${(totalBytes / 1024).toFixed(1)} KB`);
     setErrorMsg('');
-    setErrorMsg('');
-    
-    addLog(`Loading file "${file.name}" into virtual buffer (${sizeKB} KB)...`, 'info');
+    setIsManualInput(false);
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      setFileContent(content);
-      addLog(`File loaded. Content represents ${content.split('\n').length} lines. Click 'Extract VSS-110 Data' to run parser.`, 'success');
-    };
-    reader.onerror = () => {
-      addLog("Failed to read file from disk.", "error");
-      setErrorMsg("An error occurred while reading the file.");
-    };
-    reader.readAsText(file);
+    addLog(`Loading ${txtFiles.length} file(s) into buffer (${(totalBytes/1024).toFixed(1)} KB total)...`, 'info');
+
+    // Read all files and concatenate contents with a separator
+    Promise.all(txtFiles.map(f => {
+      return new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => resolve(ev.target?.result as string || '');
+        reader.onerror = () => reject(new Error(`Failed reading ${f.name}`));
+        reader.readAsText(f);
+      });
+    }))
+    .then(contents => {
+      const combined = contents.join('\n\n---FILE_BOUNDARY---\n\n');
+      setFileContent(combined);
+      addLog(`Combined ${txtFiles.length} file(s) into buffer. Click 'Extract VSS-110 Data' to run parser on all sections.`, 'success');
+    })
+    .catch(err => {
+      addLog(`Failed to read files: ${err.message}`, 'error');
+      setErrorMsg(`An error occurred while reading the files: ${err.message}`);
+    });
   };
 
   // Run the parsing regex algorithms
@@ -114,6 +127,7 @@ export default function App() {
     // Artificial tiny lag to show beautiful system compilation loading flow
     setTimeout(() => {
       try {
+        // Run parser over combined buffer; it will find all independent sections across files
         const parsed = parseVSS110Text(fileContent);
         setRecords(parsed);
         setIsProcessing(false);
@@ -337,6 +351,7 @@ export default function App() {
                         ref={fileInputRef}
                         onChange={handleFileInputChange}
                         accept=".txt"
+                        multiple
                         className="hidden"
                       />
                       

@@ -7,7 +7,8 @@ import { VSS110Record } from './parser';
  */
 export function exportVSS110ToExcel(records: VSS110Record[], originalFilename?: string): string {
   // Map internal database keys to clean spreadsheet headers
-  const excelData = records.map(rec => ({
+  // If there are no records, create an empty row to preserve headers
+  const excelData = (records && records.length > 0) ? records.map(rec => ({
     "REPORT_ID": rec.REPORT_ID,
     "REPORTING_FOR": rec.REPORTING_FOR,
     "REPORT_DATE": rec.REPORT_DATE,
@@ -18,7 +19,20 @@ export function exportVSS110ToExcel(records: VSS110Record[], originalFilename?: 
     "VISA_CHARGES_CREDIT": rec.VISA_CHARGES_CREDIT,
     "VISA_CHARGES_DEBIT": rec.VISA_CHARGES_DEBIT,
     "VISA_CHARGES_TOTAL": rec.VISA_CHARGES_TOTAL
-  }));
+  })) : [
+    {
+      REPORT_ID: '',
+      REPORTING_FOR: '',
+      REPORT_DATE: '',
+      SETTLEMENT_CURRENCY: '',
+      REIMBURSEMENT_FEES_CREDIT: '',
+      REIMBURSEMENT_FEES_DEBIT: '',
+      REIMBURSEMENT_FEES_TOTAL: '',
+      VISA_CHARGES_CREDIT: '',
+      VISA_CHARGES_DEBIT: '',
+      VISA_CHARGES_TOTAL: ''
+    }
+  ];
 
   // Create worksheet
   const worksheet = XLSX.utils.json_to_sheet(excelData);
