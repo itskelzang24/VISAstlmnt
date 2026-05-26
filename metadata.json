@@ -1,0 +1,6 @@
+{
+  "name": "Visa Settlement VSS-110 Extractor",
+  "description": "Upload and parse Visa Settlement text files to extract VSS-110 reports and export to fully formatted Excel files.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

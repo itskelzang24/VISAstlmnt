@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visa Settlement VSS-110 Data Extractor</title>
+    <!-- Tailwind CSS Play CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-800">
+    <!-- Navbar -->
+    <header class="bg-slate-900 text-white shadow-sm sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="h-10 w-10 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-lg text-white shadow-inner">
+                    V
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight">Visa Settlement Extractor</h1>
+                    <p class="text-xs text-slate-400">VSS-110 Report Parser &amp; Excel Exporter</p>
+                </div>
+            </div>
+            <div class="text-sm font-mono text-slate-300 bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700">
+                Type: Local Python Web App
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Banner/Instructions Info -->
+        <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm mb-8">
+            <div class="md:flex md:items-center md:justify-between">
+                <div class="max-w-xl">
+                    <h2 class="text-xl font-bold text-slate-900 mb-2">Automated VSS-110 Settlement Report Extractor</h2>
+                    <p class="text-sm text-slate-600 leading-relaxed">
+                        This workflow parses official Visa raw settlement files (.txt files) to isolate independent <strong>VSS-110</strong> reports structure. It automatically processes Reimbursement Fees and Visa Charges issuer totals into clean row formats.
+                    </p>
+                </div>
+                <div class="mt-4 md:mt-0 bg-blue-50 text-blue-800 p-4 rounded-xl border border-blue-100 flex items-start space-x-3 max-w-sm">
+                    <svg class="h-5 w-5 text-blue-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div class="text-xs leading-normal">
+                        <strong>Parsing Scope:</strong> Start of report blocks identified by <code>REPORT ID: VSS-110</code>, isolated up to <code>*** END OF VSS-110 REPORT ***</code>. Non-matching templates are filtered out.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Two Columns: Workspace Upload vs Processing Center -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <!-- Left Side: Dropzone upload controller (col-span-4) -->
+            <div class="col-span-1 lg:col-span-4 space-y-6">
+                <!-- File Upload Box -->
+                <div class="bg-white shadow-sm border border-slate-200 rounded-2xl p-6">
+                    <h3 class="text-base font-semibold text-slate-900 mb-4">Upload raw report</h3>
+                    
+                    <form id="uploadForm" class="space-y-4">
+                        <div id="dropZone" class="border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-xl p-8 transition-all duration-200 ease-in-out text-center cursor-pointer bg-slate-50 relative group">
+                            <input type="file" id="fileInput" name="file" accept=".txt" class="hidden">
+                            <svg class="mx-auto h-12 w-12 text-slate-400 group-hover:text-blue-500 transition-colors mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
+                            <p class="text-sm font-medium text-slate-800">Drag &amp; drop file here</p>
+                            <p class="text-xs text-slate-400 mt-1">Plain text settlement files (*.txt only)</p>
+                        </div>
+                        
+                        <!-- Selected File Status Info -->
+                        <div id="fileInfoBox" class="hidden p-3.5 bg-slate-100 rounded-xl border border-slate-200 text-xs flex items-center justify-between">
+                            <div class="flex items-center space-x-2.5 min-w-0">
+                                <svg class="h-5 w-5 text-slate-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                <span id="fileNameLabel" class="font-medium text-slate-800 truncate">report_vss110.txt</span>
+                            </div>
+                            <span id="fileSizeLabel" class="text-slate-500 flex-shrink-0 ml-1">45 KB</span>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="pt-2 flex flex-col gap-2">
+                            <button type="submit" id="processBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm py-2.5 px-4 rounded-xl shadow-sm transition flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50" disabled>
+                                <span>Extract Data</span>
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                </svg>
+                            </button>
+                            <button type="button" id="clearBtn" class="w-full bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-medium text-sm py-2 px-4 rounded-xl transition cursor-pointer">
+                                Reset Workspace
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Live Logs / Process Status Notifications -->
+                <div class="bg-white shadow-sm border border-slate-200 rounded-2xl p-6">
+                    <h3 class="text-base font-semibold text-slate-900 mb-3">System Logs</h3>
+                    <div id="logsContainer" class="bg-slate-950 rounded-xl p-4 font-mono text-[11px] text-emerald-400 h-52 overflow-y-auto space-y-2 border border-slate-800">
+                        <div class="text-slate-500">[2026-05-26 11:03:44] Extractor engine online. Ready to accept files.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Side: Extracted Output Previews (col-span-8) -->
+            <div class="col-span-1 lg:col-span-8 space-y-6">
+                <!-- Welcome/Placeholder card standard preview status -->
+                <div id="placeholderPanel" class="bg-white shadow-sm border border-slate-200 rounded-2xl py-16 px-8 text-center">
+                    <svg class="mx-auto h-16 w-16 text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <h3 class="text-lg font-semibold text-slate-900">No Data Extracted Yet</h3>
+                    <p class="text-slate-500 text-sm max-w-sm mx-auto mt-2.5">
+                        Please select and process a Visa Settlement text report to run the regex extraction rules.
+                    </p>
+                </div>
+
+                <!-- Processing Loader State -->
+                <div id="loaderPanel" class="hidden bg-white shadow-sm border border-slate-200 rounded-2xl py-20 px-8 text-center">
+                    <div class="mx-auto h-12 w-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+                    <h3 class="text-base font-medium text-slate-800">Extracting VSS-110 Blocks...</h3>
+                    <p class="text-slate-400 text-xs mt-1">Analyzing sections, locating header details and reimbursement values</p>
+                </div>
+
+                <!-- Error Response Alert -->
+                <div id="errorPanel" class="hidden bg-red-50 border border-red-200 rounded-2xl p-6">
+                    <div class="flex items-start space-x-3">
+                        <svg class="h-6 w-6 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <div>
+                            <h4 id="errorHeadline" class="text-sm font-semibold text-red-800">Processing Failed</h4>
+                            <p id="errorDescription" class="text-xs text-red-600 mt-1 leading-normal">
+                                The file structure failed to adhere to VSS-110 parsing patterns.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Data Results Workspace -->
+                <div id="resultsPanel" class="hidden space-y-4">
+                    <!-- Actions Row -->
+                    <div class="bg-white shadow-sm border border-slate-200 rounded-2xl px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div>
+                            <span class="text-xs text-slate-400 uppercase tracking-widest font-semibold font-mono">Matched Reports</span>
+                            <h3 class="text-lg font-bold text-slate-900 mt-0.5 flex items-center">
+                                <span id="matchCountBadge" class="bg-blue-600 text-white text-xs px-2.5 py-1 rounded-full mr-2.5 font-bold">0</span>
+                                VSS-110 Records Found
+                            </h3>
+                        </div>
+                        <button id="downloadExcelBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm py-2 px-5 rounded-xl shadow-sm transition flex items-center justify-center space-x-2.5 cursor-pointer">
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <span>Download Full Excel</span>
+                        </button>
+                    </div>
+
+                    <!-- Statistics / Summary Cards Grid -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                            <div class="text-xs text-slate-400 uppercase tracking-wide font-mono">Total Cumulative Reimbursements</div>
+                            <div class="text-xl font-bold mt-2 text-slate-900 flex justify-between items-baseline">
+                                <span id="reimbTotalCreditLabel" class="text-emerald-700 text-sm font-medium">Credits: 0.00</span>
+                                <span id="reimbTotalDebitLabel" class="text-rose-700 text-sm font-medium">Debits: 0.00</span>
+                            </div>
+                        </div>
+                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                            <div class="text-xs text-slate-400 uppercase tracking-wide font-mono">Total Cumulative Visa Charges</div>
+                            <div class="text-xl font-bold mt-2 text-slate-900 flex justify-between items-baseline">
+                                <span id="visaTotalCreditLabel" class="text-emerald-700 text-sm font-medium">Credits: 0.00</span>
+                                <span id="visaTotalDebitLabel" class="text-rose-700 text-sm font-medium">Debits: 0.00</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Table Container with scrolling -->
+                    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-slate-200 text-left text-xs text-slate-700">
+                                <thead class="bg-slate-900 text-white select-none whitespace-nowrap">
+                                    <tr>
+                                        <th class="px-3.5 py-3 border-r border-slate-800 text-center font-bold">#</th>
+                                        <th class="px-4 py-3 border-r border-slate-800 font-bold">REPORT_ID</th>
+                                        <th class="px-4 py-3 border-r border-slate-800 font-bold">REPORTING_FOR</th>
+                                        <th class="px-4 py-3 border-r border-slate-800 font-bold text-center">REPORT_DATE</th>
+                                        <th class="px-4 py-3 border-r border-slate-800 font-bold text-center">CURRENCY</th>
+                                        <th class="px-4 py-3 border-r border-slate-800 font-bold bg-slate-850 text-right">REIMB_CREDIT</th>
+                                        <th class="px-4 py-3 border-r border-slate-800 font-bold bg-slate-850 text-right">REIMB_DEBIT</th>
+                                        <th class="px-4 py-3 border-r border-slate-800 font-bold bg-slate-850 text-right">REIMB_TOTAL</th>
+                                        <th class="px-4 py-3 border-r border-slate-800 font-bold bg-slate-800 text-right">VISA_CREDIT</th>
+                                        <th class="px-4 py-3 border-r border-slate-800 font-bold bg-slate-800 text-right">VISA_DEBIT</th>
+                                        <th class="px-4 py-3 text-right bg-slate-800 font-bold">VISA_TOTAL</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tableBody" class="divide-y divide-slate-200 bg-white leading-relaxed">
+                                    <!-- Dynamic rows from uploaded data -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 border-t border-slate-800 text-slate-400 text-xs py-8 mt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-2">
+            <p>Visa VSS-110 Data Extraction Engine &bull; Production Ready Python Application Architecture</p>
+            <p class="text-slate-600 select-none">&copy; 2026 Visa Settlement Processors. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Frontend Functional JavaScript -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const dropZone = document.getElementById('dropZone');
+            const fileInput = document.getElementById('fileInput');
+            const uploadForm = document.getElementById('uploadForm');
+            const fileInfoBox = document.getElementById('fileInfoBox');
+            const fileNameLabel = document.getElementById('fileNameLabel');
+            const fileSizeLabel = document.getElementById('fileSizeLabel');
+            const processBtn = document.getElementById('processBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            
+            const placeholderPanel = document.getElementById('placeholderPanel');
+            const loaderPanel = document.getElementById('loaderPanel');
+            const errorPanel = document.getElementById('errorPanel');
+            const resultsPanel = document.getElementById('resultsPanel');
+            
+            const matchCountBadge = document.getElementById('matchCountBadge');
+            const tableBody = document.getElementById('tableBody');
+            const logsContainer = document.getElementById('logsContainer');
+            const downloadExcelBtn = document.getElementById('downloadExcelBtn');
+            
+            const reimbTotalCreditLabel = document.getElementById('reimbTotalCreditLabel');
+            const reimbTotalDebitLabel = document.getElementById('reimbTotalDebitLabel');
+            const visaTotalCreditLabel = document.getElementById('visaTotalCreditLabel');
+            const visaTotalDebitLabel = document.getElementById('visaTotalDebitLabel');
+
+            let currentFile = null;
+            let currentData = [];
+
+            function log(message, type = 'info') {
+                const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+                let color = 'text-green-400';
+                if (type === 'error') color = 'text-rose-400';
+                if (type === 'success') color = 'text-cyan-300';
+                
+                const entry = document.createElement('div');
+                entry.className = color;
+                entry.innerHTML = `<span class="text-slate-500">[${now}]</span> ${message}`;
+                logsContainer.appendChild(entry);
+                logsContainer.scrollTop = logsContainer.scrollHeight;
+            }
+
+            // Click Zone Event
+            dropZone.addEventListener('click', () => fileInput.click());
+
+            // Drag and Drop Controls
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dropZone.classList.add('border-blue-500', 'bg-blue-50');
+                }, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dropZone.classList.remove('border-blue-500', 'bg-blue-50');
+                }, false);
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                if (files.length) handleFileSelection(files[0]);
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length) handleFileSelection(e.target.files[0]);
+            });
+
+            function handleFileSelection(file) {
+                if (!file.name.endsWith('.txt')) {
+                    log(`Rejected file: ${file.name}. Only plain text (.txt) is supported.`, 'error');
+                    alert('Only plain text (.txt) Visa Report files are supported.');
+                    return;
+                }
+                
+                currentFile = file;
+                fileNameLabel.textContent = file.name;
+                
+                // Format size
+                const sizeKB = (file.size / 1024).toFixed(1);
+                fileSizeLabel.textContent = `${sizeKB} KB`;
+                
+                fileInfoBox.classList.remove('hidden');
+                processBtn.removeAttribute('disabled');
+                
+                log(`Selected file "${file.name}" (${sizeKB} KB). Ready for VSS-110 parse.`, 'info');
+            }
+
+            // Reset workspace
+            clearBtn.addEventListener('click', () => {
+                currentFile = null;
+                currentData = [];
+                fileInput.value = '';
+                fileInfoBox.classList.add('hidden');
+                processBtn.setAttribute('disabled', 'true');
+                
+                placeholderPanel.classList.remove('hidden');
+                loaderPanel.classList.add('hidden');
+                errorPanel.classList.add('hidden');
+                resultsPanel.classList.add('hidden');
+                
+                log('Workspace cleared. Input buffer evacuated.', 'info');
+            });
+
+            // Submit upload parser Trigger
+            uploadForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (!currentFile) return;
+
+                placeholderPanel.classList.add('hidden');
+                errorPanel.classList.add('hidden');
+                resultsPanel.classList.add('hidden');
+                loaderPanel.classList.remove('hidden');
+                
+                log(`Uploading and processing file: ${currentFile.name}...`, 'info');
+
+                const formData = new FormData();
+                formData.append('file', currentFile);
+
+                try {
+                    const response = await fetch('/api/process', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await response.json();
+                    loaderPanel.classList.add('hidden');
+
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.error || 'Server error occurred during processing');
+                    }
+
+                    currentData = result.data;
+                    displayParsedResults(currentData);
+                    log(`Processing complete. Found ${currentData.length} records.`, 'success');
+
+                } catch (err) {
+                    loaderPanel.classList.add('hidden');
+                    errorPanel.classList.remove('hidden');
+                    document.getElementById('errorDescription').textContent = err.message;
+                    log(`Parse failed: ${err.message}`, 'error');
+                }
+            });
+
+            function displayParsedResults(records) {
+                tableBody.innerHTML = '';
+                
+                if (records.length === 0) {
+                    placeholderPanel.classList.remove('hidden');
+                    log('No VSS-110 reports matching reporting patterns were found in the file.', 'error');
+                    alert('No VSS-110 sections detected in this file. Verify sections contain start ID: "REPORT ID: VSS-110"');
+                    return;
+                }
+
+                resultsPanel.classList.remove('hidden');
+                matchCountBadge.textContent = records.length;
+
+                // Cumulative statistics calculators
+                let totalReimbCredit = 0, totalReimbDebit = 0;
+                let totalVisaCredit = 0, totalVisaDebit = 0;
+
+                records.forEach((row, index) => {
+                    const tr = document.createElement('tr');
+                    tr.className = index % 2 === 0 ? 'bg-slate-50/50 hover:bg-slate-100/70' : 'bg-white hover:bg-slate-100/70';
+                    
+                    // Parse values out for summary accumulations (strip commas etc)
+                    const reimbC = parseFloat(row.REIMBURSEMENT_FEES_CREDIT.replace(/,/g, '')) || 0;
+                    const reimbD = parseFloat(row.REIMBURSEMENT_FEES_DEBIT.replace(/,/g, '')) || 0;
+                    const visaC = parseFloat(row.VISA_CHARGES_CREDIT.replace(/,/g, '')) || 0;
+                    const visaD = parseFloat(row.VISA_CHARGES_DEBIT.replace(/,/g, '')) || 0;
+
+                    totalReimbCredit += reimbC;
+                    totalReimbDebit += reimbD;
+                    totalVisaCredit += visaC;
+                    totalVisaDebit += visaD;
+
+                    tr.innerHTML = `
+                        <td class="px-3.5 py-3 border-r border-slate-200 text-center font-semibold text-slate-500">${index + 1}</td>
+                        <td class="px-4 py-3 border-r border-slate-200 font-mono font-medium text-slate-900">${row.REPORT_ID}</td>
+                        <td class="px-4 py-3 border-r border-slate-200 font-medium max-w-[200px] truncate" title="${row.REPORTING_FOR}">${row.REPORTING_FOR}</td>
+                        <td class="px-4 py-3 border-r border-slate-200 text-center font-mono font-medium">${row.REPORT_DATE}</td>
+                        <td class="px-4 py-3 border-r border-slate-200 text-center font-mono font-semibold text-slate-600">${row.SETTLEMENT_CURRENCY}</td>
+                        <td class="px-4 py-3 border-r border-slate-200 text-right bg-slate-50/70 font-mono text-emerald-700 font-medium">${row.REIMBURSEMENT_FEES_CREDIT}</td>
+                        <td class="px-4 py-3 border-r border-slate-200 text-right bg-slate-50/70 font-mono text-rose-700 font-medium">${row.REIMBURSEMENT_FEES_DEBIT}</td>
+                        <td class="px-4 py-3 border-r border-slate-200 text-right bg-slate-50/70 font-mono font-bold text-slate-900">${row.REIMBURSEMENT_FEES_TOTAL}</td>
+                        <td class="px-4 py-3 border-r border-slate-200 text-right bg-blue-50/30 font-mono text-emerald-700 font-medium">${row.VISA_CHARGES_CREDIT}</td>
+                        <td class="px-4 py-3 border-r border-slate-200 text-right bg-blue-50/30 font-mono text-rose-700 font-medium">${row.VISA_CHARGES_DEBIT}</td>
+                        <td class="px-4 py-3 text-right bg-blue-50/30 font-mono font-bold text-slate-900">${row.VISA_CHARGES_TOTAL}</td>
+                    `;
+                    tableBody.appendChild(tr);
+                });
+
+                // Update cumulative panels
+                reimbTotalCreditLabel.textContent = `Credits: ${totalReimbCredit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits:2})}`;
+                reimbTotalDebitLabel.textContent = `Debits: ${totalReimbDebit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits:2})}`;
+                visaTotalCreditLabel.textContent = `Credits: ${totalVisaCredit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits:2})}`;
+                visaTotalDebitLabel.textContent = `Debits: ${totalVisaDebit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits:2})}`;
+            }
+
+            // Exporter Event Handler
+            downloadExcelBtn.addEventListener('click', async () => {
+                if (currentData.length === 0) return;
+                
+                log('Triggering Excel report compile pipeline...', 'info');
+
+                try {
+                    const response = await fetch('/api/download', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ data: currentData })
+                    });
+
+                    if (!response.ok) throw new Error('Excel compilation on core failed');
+
+                    const blob = await response.blob();
+                    
+                    // Extract filename from headers if possible or formulate fallback
+                    const dispHeader = response.headers.get('Content-Disposition');
+                    let targetFilename = `VSS110_Output_${new Date().toISOString().slice(0,19).replace(/[-T:]/g,"_")}.xlsx`;
+                    
+                    if (dispHeader && dispHeader.indexOf('filename=') !== -1) {
+                        targetFilename = dispHeader.split('filename=')[1].trim().replace(/['"]/g, '');
+                    }
+
+                    const link = document.createElement('a');
+                    link.href = window.URL.createObjectURL(blob);
+                    link.download = targetFilename;
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                    
+                    log(`Downloaded formatted spreadsheet: ${targetFilename}`, 'success');
+
+                } catch (err) {
+                    log(`Export error: ${err.message}`, 'error');
+                    alert(`Failed to export Excel spreadsheet: ${err.message}`);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
